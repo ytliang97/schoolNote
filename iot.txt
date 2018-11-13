@@ -1,0 +1,62 @@
+timer
+1. rtimer can be used in interrupt contexts others cannot.
+2. rtimer: real-time task scheduling
+3. 使用方式：時間過期時再次呼叫timer module
+4. 幾個timer 的不同在於"the resolution of time"
+5. 
+	timers:  system clock ticks
+	stimers: seconds
+	(period, second > system clock ticks)
+	(interrupt, safe)
+	etimer: 隔一段period用"schedule events"
+	(etimer 可以在event timer 過期時，post event "PROCESS_EVENT_TIMER" 來generate timed events)
+	(etimer 用較小數值範圍的clock_time()->接受變數型態是clock_time_t)
+	rtimer: 讓process到應執行時間，啟動執行"without delay"，即用於"time critical code"
+6. 用途：讓使用timer的process可以一段時間進入省電模式，延長呼叫此process的硬體的電源壽命
+7. 
+	etimer 使用方式：
+		a)宣告etimer, static struct etimer et;
+		b)用etimer_set設置此event timer(et)的delay time-->
+		c)用etimer_expired檢查此event timer是否過期
+		d)用PROCESS_WAIT_EVENT_UNTIL()停住，直到收到event 過期的通知，才會結束此行執行
+		e)用etimer_set()重新設定下一次的過期時間
+	rtimer 使用方式：
+		a)RTIMER_NOW()：取得現在系統時間(從開機到現在已經幾個tick過去)
+		b)RTIMER_SECOND：常數，每一秒會有幾次tick(好像通常一秒一tick)
+
+
+clock module
+1. CLOCK_SECOND: 1 sec tick time
+2. clock_time(): 回傳現在系統時間，型態是3. clock_time_t(unsigned)，數值範圍比clock_seconds()小
+4. clock_seconds(): 回傳現在系統時間，型態是 unsigned long
+5. contiki system 啟動時，系統時間從0開始增加(clock_init()被call)
+6. clock_delay(), clock_wait(): 用於blocking the CPU，用於需要短時間的wait且沒有放棄CPU控制權
+
+Process run 的模式有分cooperative context, preemptive context
+一般是run在cooperative
+preemptive是用在driver interrupt和real-time tasks(timer)
+preemptive可以stop cooperative
+
+event 分成 asynchronous, synchronous
+
+asynchronous        |  synchronous
+--------------------|---------------------
+event 被放在kernel  | event產生後立即被
+event queue, 稍後由 | 傳送給接收的process
+kernel傳給要接收的  |
+process             |
+--------------------|---------------------
+process_post()      | process_post_synch()
+adc_get_noblock()   | adc_get()
+--------------------|----------------------
+可以傳送給一個特定  | 只能傳送給特定的
+process或所有執行中 | process，被傳送event
+的process。         | 的process直接被invoked
+1.給特定：kernel    | ，且傳送方會block直到
+invoke that process | 接收方處理完event。
+to deliver the event| 
+2.給all：           |
+sequentially deliver|
+--------------------------------------------
+        接收方不會知道收到的event是
+        哪一種
